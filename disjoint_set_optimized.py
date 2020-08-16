@@ -29,6 +29,8 @@ class Disjoint_Sets:
     # stores ranks of elements - upper bound on number of children of
     # the element.
     self.ranks=[0]*n
+    # is true and sensible only for roots of trees
+    self.tree_size=[1]*n
 
   def union(self, id1, id2):
     """
@@ -55,6 +57,8 @@ class Disjoint_Sets:
 
     if self.ranks[new_parent]==self.ranks[old_parent]:
       self.ranks[new_parent]+=1
+
+    self.tree_size[new_parent]+=self.tree_size[old_parent]
 
 
   def find_set(self,i):

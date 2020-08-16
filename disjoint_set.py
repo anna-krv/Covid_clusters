@@ -5,7 +5,7 @@ Created on Tue Aug  4 14:00:43 2020
 @author: Anna Kravets
 """
 
-class Disjoint_Sets():
+class Disjoint_Sets:
   def __init__(self):
     # stores pairs (object, index of object in parents list)
     self.mapping=dict()

@@ -6,7 +6,7 @@ Created on Tue Aug  4 14:00:43 2020
 """
 from linked_list import Linked_List
 
-class Disjoint_Sets():
+class Disjoint_Sets:
 
   def __init__(self):
     # will store pairs: (object, set the object belongs to)

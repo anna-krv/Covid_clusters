@@ -35,6 +35,38 @@ class Edge:
       +' weight: '+str(self.weight)
 
 
+def get_clusters(graph:Graph, n_clusters:int):
+  """
+  Builds n_clusters on vertices from graph. Uses procedure for building MST but
+  stops when gets n_clusters # of connected components.
+
+  Args:
+    graph (Graph): connected, undirected graph with weighted edges.
+    n_clusters (int): number of clusters to build.
+
+  Returns:
+    list: contains sets that have been formed, set=cluster.
+
+  """
+  edge_list=sorted(graph.edge_list, key=lambda edge: edge.weight)
+  edge_list_tree=[]
+  edge_index=0
+  components=Disjoint_Sets(graph.n_vert)
+  optimal_size=graph.n_vert/n_clusters
+  while len(edge_list_tree)<graph.n_vert-n_clusters:
+    edge=edge_list[edge_index]
+    from_vert, to_vert=edge.from_vert, edge.to_vert
+    parent_from=components.find_set(from_vert)
+    parent_to=components.find_set(to_vert)
+    if parent_from!=parent_to and \
+      components.tree_size[parent_from]<2*optimal_size and \
+        components.tree_size[parent_to]<2*optimal_size:
+      components.union(from_vert, to_vert)
+      edge_list_tree.append(edge)
+      #print(components.ranks[parent_from], components.ranks[parent_to])
+    edge_index+=1
+  return components.get_all_sets()
+
 def MST(graph: Graph):
   """
   Builds minimum spanning tree using Kruskal's algorithm.
