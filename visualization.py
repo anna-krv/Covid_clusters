@@ -41,9 +41,14 @@ def geolocate(country):
         # Return missing value
         return np.nan
 
+builder=clusters_builder.Clusters_Builder(n_clusters=n)
 
-clusters_dict={0:['Ukraine',0], 1:['Poland',1], 2:['Russia',2], 3:['China',3], \
-               4:['USA',4]}
+clusters=builder.get_clusters('2020-03-25')
+print([len(my_set) for my_set in clusters])
+rows=[[country,i] for i in range(n) for country in clusters[i]]
+clusters_dict={_id: rows[_id] for _id in range(builder.n_vert) }
+#clusters_dict={0:['Ukraine',0], 1:['Poland',1], 2:['Russia',2], 3:['China',3], \
+ #              4:['USA',4]}
 
 df=pd.DataFrame.from_dict(clusters_dict,orient='index', columns=['CountryName', 'Cluster'])
 
@@ -52,12 +57,14 @@ df['Country']=df['codes'].apply(lambda pair: pair[0])
 df['Continent']=df['codes'].apply(lambda pair: pair[1])
 
 df['Geolocate']=df['Country'].apply(geolocate)
-df['latitude']=df['Geolocate'].apply(lambda pair: pair[0])
-df['longitude']=df['Geolocate'].apply(lambda pair: pair[1])
+#df['latitude']=df['Geolocate'].apply(lambda pair: pair[0])
+#df['longitude']=df['Geolocate'].apply(lambda pair: pair[1])
 
 
-print(df)
+print(df['Geolocate'])
 
+
+'''
 #empty map
 world_map= folium.Map(tiles="cartodbpositron")
 marker_cluster = MarkerCluster().add_to(world_map)
@@ -94,3 +101,6 @@ folium.Choropleth(
     nan_fill_color='white'
 ).add_to(m)
 m.save('covid.html')
+
+
+'''
