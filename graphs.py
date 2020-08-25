@@ -5,6 +5,7 @@ Created on Wed Aug  5 13:06:38 2020
 @author: Anna Kravets
 """
 from disjoint_set_optimized import Disjoint_Sets
+import numpy as np
 
 class Graph:
   def __init__(self, n_vert:int, edge_list:list):
@@ -59,13 +60,46 @@ def get_clusters(graph:Graph, n_clusters:int):
     parent_from=components.find_set(from_vert)
     parent_to=components.find_set(to_vert)
     if parent_from!=parent_to and \
-      components.tree_size[parent_from]<2*optimal_size and \
-        components.tree_size[parent_to]<2*optimal_size:
+      components.tree_size[parent_from]<180 and \
+        components.tree_size[parent_to]<180:
       components.union(from_vert, to_vert)
       edge_list_tree.append(edge)
-      #print(components.ranks[parent_from], components.ranks[parent_to])
     edge_index+=1
   return components.get_all_sets()
+
+
+def get_clusters_optimal(graph:Graph):
+  """
+  Builds optimal # of clusters on vertices from graph. Uses procedure for building 
+  MST and then deletes edges with weight W>Mean_weight+std_weight.
+
+  Args:
+    graph (Graph): connected, undirected graph with weighted edges.
+
+  Returns:
+    list: contains sets that have been formed, set=cluster.
+
+  """
+  edge_list=sorted(graph.edge_list, key=lambda edge: edge.weight)
+  edge_list_tree=[]
+  edge_index=0
+  components=Disjoint_Sets(graph.n_vert)
+  components_history=[components.get_all_sets()]
+  while len(edge_list_tree)<graph.n_vert-1:
+    edge=edge_list[edge_index]
+    from_vert, to_vert=edge.from_vert, edge.to_vert
+    parent_from=components.find_set(from_vert)
+    parent_to=components.find_set(to_vert)
+    if parent_from!=parent_to:
+      components.union(from_vert, to_vert)
+      components_history.append(components.get_all_sets())
+      edge_list_tree.append(edge)
+    edge_index+=1
+  weights=np.array([edge.weight for edge in edge_list_tree])
+  mean_weight=np.mean(weights)
+  std_weight=np.std(weights)
+  num_edge_to_delete=np.sum(weights>mean_weight+std_weight)
+  return components_history[-num_edge_to_delete-1]
 
 def MST(graph: Graph):
   """

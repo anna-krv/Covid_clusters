@@ -10,6 +10,16 @@ Mimics division of integers 0..n-1 into sets that do not intersect.
 Implements FIND SET operation on an integer and UNION operation on sets.
 Uses virtual trees with path compression and union-by-rank for more
 efficient operations.
+
+Attributes
+----------
+parents: list
+  stores index of parent for each element
+ranks: list
+  stores ranks of elements - upper bound on number of children of the element.
+tree_size: list
+  is true and sensible only for roots of trees
+  
 '''
 class Disjoint_Sets:
 
@@ -24,12 +34,8 @@ class Disjoint_Sets:
       None.
 
     """
-    # stores index of parent for each element.
     self.parents=[i for i in range(n)]
-    # stores ranks of elements - upper bound on number of children of
-    # the element.
     self.ranks=[0]*n
-    # is true and sensible only for roots of trees
     self.tree_size=[1]*n
 
   def union(self, id1, id2):
