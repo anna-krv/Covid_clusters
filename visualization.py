@@ -1,106 +1,189 @@
 # -*- coding: utf-8 -*-
 """
+Contains class that builds maps and creates pictures of geo clusters.
+
 Created on Sat Aug 15 19:39:51 2020
 
 @author: Anna Kravets
 """
-import clusters_builder
-from geopy.geocoders import Nominatim
+import branca
 import folium
-from folium.plugins import MarkerCluster
-import numpy as np
-import pandas as pd
-from pycountry_convert import country_alpha2_to_continent_code, country_name_to_country_alpha2
+import json
+import loader
+import selenium.webdriver
+import requests
+
+class MapBuilder:
+    def __init__(self):
+        self.geo_json = self.load_geo_json()
+
+    def get_color(self, feature):
+        """
+        Get color that corresponds to cluster in which admin unit is included.
+
+        Args:
+            feature (dict): contains info about admin unit (id of admin unit is
+            in feauture['properties'] dict).
+
+        Returns
+        -------
+            str: color given to cluster the admin unit belongs to.
+
+        """
+        id_ = feature['properties'][self.id_json]
+        if id_ not in self.df_dict:
+            return '#ffffff'
+        return self.colorscale(self.df_dict[id_])
+
+    def modify_geo_json(self, data):
+        for i in range(len(self.geo_json['features'])):
+            id_ = self.geo_json['features'][i]['properties'][self.id_json]
+            for name in self.col_names + ['Cluster id']:
+                self.geo_json['features'][i]['properties'][name] = 0
+            for name in self.col_names:
+                if id_ in data[self.id_df].values:
+                    self.geo_json['features'][i]['properties'][name] =\
+                        int(data[data[self.id_df] == id_][name].values[0])
+            if id_ in self.df_dict:
+                self.geo_json['features'][i]['properties']['Cluster id'] = \
+                    self.df_dict[id_]
+
+    def create_map(self, n, date):
+        self.colorscale = create_colorscale(n)
+        m = folium.Map(**self.map_args)
+        folium.GeoJson(
+            self.geo_json,
+            style_function=lambda feature: {
+                'fillColor': self.get_color(feature),
+                'fillOpacity': 1,
+                'color': 'black',
+                'weight': 0.2
+                },
+            name='COVID CLUSTERS',
+            tooltip=folium.features.GeoJsonTooltip(
+                fields=[self.name_json]+self.col_names+['Cluster id'],
+                aliases=['Name']+self.col_names+['Cluster id'])
+            ).add_to(m)
+        m.add_child(self.colorscale)
+
+        title_html = '''<head><style> html { overflow-y: hidden; }
+            </style></head>
+            '''
+        title_html += '''<h1 align="center"><b>{}</b></h3>'''.format(date)
+        m.get_root().html.add_child(folium.Element(title_html))
+
+        m.save(self.map_folder+'/'+date+'.html')
+
+    def save_map(self, builder, date):
+        clusters = builder.get_clusters(date)
+        data = builder.loader.extract_data(date)
+        n_clust = len(clusters)
+        self.df_dict = {id_: i+1 for i in range(n_clust) for id_ in clusters[i]}
+        self.modify_geo_json(data)
+        self.create_map(n_clust, date)
+
+    def save_as_img(self, dates):
+        """
+        Save screenshot of webpages containing maps for particular dates.
+
+        Args:
+            dates (list): stores dates to save images for.
+
+        Returns
+        -------
+            None.
+
+        """
+        driver = selenium.webdriver.Chrome()
+        driver.set_window_size(1100, 900) # 1800, 800 for US
+        for date in dates:
+            driver.get(
+                "file:///C:/Users/DELL/Covid_clusters/"+self.map_folder+"/"+date+".html"
+                )
+            driver.save_screenshot(self.img_folder+'/'+date+'.png')
+            print(date)
+        driver.quit()
 
 
+class MapBuilderUS(MapBuilder):
+    def __init__(self):
+        self.id_json = 'geoid'
+        self.name_json = 'namelsad'
+        self.id_df = loader.LoaderUS.ID_COLUMN
+        self.col_names = loader.LoaderUS.COLUMN_LIST
+        self.map_folder = 'html_us'
+        self.img_folder = 'pictures_us'
+        self.map_args = {'location': [36, -97], 'zoomSnap': 0.25,
+                         'zoom_start': 4.75, 'zoom_control': False}
+
+        MapBuilder.__init__(self)
+
+    def load_geo_json(self):
+        id_NY_list = ['36005', '36081', '36047', '36085']
+        NY_id = '36061'
+        path = 'data/us-county-boundaries.geojson'
+        with open(path) as boundaries:
+            geo_json = json.load(boundaries)
+            for i in range(len(geo_json['features'])):
+                id_ = geo_json['features'][i]['properties'][self.id_json]
+                if id_ in id_NY_list:
+                    id_ = NY_id
+                geo_json['features'][i]['properties'][self.id_json] = \
+                    int('840'+id_)
+            return geo_json
+
+class MapBuilderCountries(MapBuilder):
+    def __init__(self):
+        self.id_json = 'ADMIN'
+        self.name_json = 'ADMIN'
+        self.id_df = loader.LoaderCountries.ID_COLUMN
+        self.col_names = loader.LoaderCountries.COLUMN_LIST
+        self.img_folder = 'pictures_countries'
+        self.map_folder = 'html_countries'
+        self.map_args = {'tiles': "cartodbpositron", 'zoom_start': 2,
+                         'location': [40., 10.], 'zoom_control': False,
+                         'max_bounds': True}
+
+        MapBuilder.__init__(self)
+
+    def load_geo_json(self):
+        country_shapes = 'https://raw.githubusercontent.com/datasets/' + \
+            'geo-countries/master/data/countries.geojson'
+        geo_json = json.loads(requests.get(country_shapes).text)
+        name_dict = {
+            'United States of America': 'US',
+            'Republic of the Congo': 'Congo (Kinshasa)',
+            'Democratic Republic of the Congo': 'Congo (Brazzaville)',
+            'Republic of Serbia': 'Serbia',
+            'Czech Republic': 'Czechia',
+            'Taiwan': 'Taiwan*',
+            'Macedonia': 'North Macedonia'
+            }
+        for i in range(len(geo_json['features'])):
+            id_ = geo_json['features'][i]['properties'][self.id_json]
+            if id_ in name_dict:
+                geo_json['features'][i]['properties'][self.id_json] = \
+                    name_dict[id_]
+        return geo_json
 
 
-n=100
+def create_colorscale(n):
+    """
+    Create StepColormap for segment [0,n] with step 1.
 
+    Colors used are yellow, orange, red.
 
-def get_continent(col):
-    try:
-        cn_a2_code =  country_name_to_country_alpha2(col)
-    except:
-        cn_a2_code = 'Unknown' 
-    try:
-        cn_continent = country_alpha2_to_continent_code(cn_a2_code)
-    except:
-        cn_continent = 'Unknown' 
-    return (cn_a2_code, cn_continent)
+    Args:
+        n (int): segment [0,n] will be mapped to n colors.
 
+    Returns
+    -------
+        colorscale (branca.colormap.StepColormap): maps segments (i,i+1] to
+                                                                  diff colors.
 
-geolocator = Nominatim(user_agent="anna_visualization_for_covid")
-def geolocate(country):
-    try:
-        # Geolocate the center of the country
-        loc = geolocator.geocode(country)
-        # And return latitude and longitude
-        return (loc.latitude, loc.longitude)
-    except:
-        # Return missing value
-        return np.nan
-
-builder=clusters_builder.Clusters_Builder(n_clusters=n)
-
-clusters=builder.get_clusters('2020-03-25')
-print([len(my_set) for my_set in clusters])
-rows=[[country,i] for i in range(n) for country in clusters[i]]
-clusters_dict={_id: rows[_id] for _id in range(builder.n_vert) }
-#clusters_dict={0:['Ukraine',0], 1:['Poland',1], 2:['Russia',2], 3:['China',3], \
- #              4:['USA',4]}
-
-df=pd.DataFrame.from_dict(clusters_dict,orient='index', columns=['CountryName', 'Cluster'])
-
-df['codes']=df['CountryName'].apply(get_continent)
-df['Country']=df['codes'].apply(lambda pair: pair[0])
-df['Continent']=df['codes'].apply(lambda pair: pair[1])
-
-df['Geolocate']=df['Country'].apply(geolocate)
-#df['latitude']=df['Geolocate'].apply(lambda pair: pair[0])
-#df['longitude']=df['Geolocate'].apply(lambda pair: pair[1])
-
-
-print(df['Geolocate'])
-
-
-'''
-#empty map
-world_map= folium.Map(tiles="cartodbpositron")
-marker_cluster = MarkerCluster().add_to(world_map)
-#for each coordinate, create circlemarker of user percent
-for i in range(len(df)):
-        #lat = df.iloc[i]['Geolocate'][0]
-        #long = df.iloc[i]['Geolocate'][1]
-        radius=8
-        popup_text = """Country : {}<br>
-                    %of Cluster : {}<br>"""
-        popup_text = popup_text.format(df.iloc[i]['Country'],
-                                   df.iloc[i]['Cluster']
-                                   )
-        folium.CircleMarker(location = list(df.iloc[i]['Geolocate']), radius=radius, popup= popup_text, fill =True).add_to(marker_cluster)
-#show the map
-world_map.save('my_map.html')
-
-
-#Setting up the world countries data URL
-url = 'https://raw.githubusercontent.com/python-visualization/folium/master/examples/data'
-
-
-country_shapes = f'{url}/world-countries.json'
-m= folium.Map(tiles="cartodbpositron")
-folium.Choropleth(
-    #The GeoJSON data to represent the world country
-    geo_data=country_shapes,
-    name='choropleth COVID-19',
-    data=df,
-    #The column aceppting list with 2 value; The country name and  the numerical value
-    columns=['CountryName', 'Cluster'],
-    key_on='feature.properties.name',
-    fill_color='PuRd',
-    nan_fill_color='white'
-).add_to(m)
-m.save('covid.html')
-
-
-'''
+    """
+    colorscale = branca.colormap.linear.YlOrRd_09.scale(0, n)
+    if n > 1:
+        colorscale = colorscale.to_step(index=[i for i in range(n+1)])
+    colorscale.caption = 'Cluster id'
+    return colorscale

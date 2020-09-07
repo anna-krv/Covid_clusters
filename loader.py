@@ -15,90 +15,51 @@ class Loader:
     ----------
         DATE_FORMAT (str): format in which dates sould be passed to the
         class' methods.
-        COUNTRY_DATE_FORMAT (str): format in which dates are stored
-        in COUNTRY_INFO_FILE.
-        US_DATE_FORMAT (str): format in which dates are stored in USA_INFO_FILE.
-        COUNTRY_INFO_FILE (str): file with data about all countries.
-        POPULATION_INFO_FILE (str): file with data on population of countries
-        present in COUNTRY_INFO_FILE.
-        USA_INFO_FILE (str): file from which to get data about US counties.
 
     """
 
     DATE_FORMAT = '%d.%m.%y'
+
+    def __init__(self):
+        self.data_all_days = pd.read_csv(self.INFO_FILE)
+        self.n_vert = len(set(self.data_all_days[self.ID_COLUMN]))
+
+class LoaderCountries(Loader):
+    """Stores data from specified files. Extracts data relevent to given date.
+
+    Attributes
+    ----------
+        DATE_FORMAT (str): format in which dates sould be passed to the
+        class' methods.
+        COUNTRY_DATE_FORMAT (str): format in which dates are stored
+        in INFO_FILE.
+        INFO_FILE (str): file with data about all countries.
+        POPULATION_INFO_FILE (str): file with data on population of countries
+        present in COUNTRY_INFO_FILE.
+
+    """
+
     COUNTRY_DATE_FORMAT = '%Y-%m-%d'
-    US_DATE_FORMAT = '%#m/%#d/%y'
-    COUNTRY_INFO_FILE = 'data/full_grouped.csv'
+    INFO_FILE = 'data/full_grouped.csv'
     POPULATION_INFO_FILE = 'data/population.csv'
-    USA_INFO_FILE = 'data/usa_county_wise.csv'
+    ID_COLUMN = 'Country/Region'
+    COLUMN_LIST = ['New cases', 'New deaths', 'New recovered']
+    MAIN_COLUMN = 'New cases'
 
     def __init__(self):
         """
-        Read data with statistics on all days.
+        Save data about countries' indicators on all dates.
 
         Returns
         -------
             None.
 
         """
-        self.get_usa_data_all_days()
-
-    def get_usa_data_all_days(self):
-        """
-        Save data about US counties' indicators.
-
-        Returns
-        -------
-            None.
-
-        """
-        self.data_all_days = pd.read_csv(Loader.USA_INFO_FILE)
-        self.data_all_days = self.data_all_days.dropna(subset=['Combined_Key'])
-        self.n_vert = len(set(self.data_all_days['Combined_Key']))
-        self.name_dict = {
-            self.data_all_days.iloc[i]['UID']:
-                self.data_all_days.iloc[i]['Combined_Key'] for
-                i in range(self.n_vert)}
-
-    def get_country_data_all_days(self):
-        """
-        Save data about countries' indicators.
-
-        Returns
-        -------
-            None.
-
-        """
-        self.data_all_days = pd.read_csv(Loader.COUNTRY_INFO_FILE)
-        self.n_vert = len(set(self.data_all_days['Country/Region']))
-        self.name_dict = {i: self.data_all_days.iloc[i]['Country/Region'] for
-                          i in range(self.n_vert)}
+        Loader.__init__(self)
         self.country_population = \
-            pd.read_csv(Loader.POPULATION_INFO_FILE)['Population']
+            pd.read_csv(self.POPULATION_INFO_FILE)['Population']
 
-    def extract_usa_data(self, date):
-        """
-        Extract data for a particular date.
-
-        Args:
-            date (str): format as in DATE_FORMAT.
-
-        Returns
-        -------
-            pandas.DataFrame: contains data on given date.
-
-        """
-        date = format(dt.strptime(date, self.DATE_FORMAT).date(),
-                      Loader.US_DATE_FORMAT)
-        data_on_date = \
-            self.data_all_days.loc[self.data_all_days['Date'] == date].copy()
-        column_list = ['UID', 'Confirmed', 'Deaths']
-        data_on_date = data_on_date.loc[:, column_list]
-        data_on_date = data_on_date.loc[data_on_date['Confirmed'] +
-                                        data_on_date['Deaths'] > 7]
-        return data_on_date.reset_index(drop=True)
-
-    def extract_country_data(self, date, to_scale=False):
+    def extract_data(self, date, to_scale=False):
         """
         Extract data for a particular date.
 
@@ -113,10 +74,11 @@ class Loader:
 
         """
         date = format(dt.strptime(date, self.DATE_FORMAT).date(),
-                      Loader.COUNTRY_DATE_FORMAT)
+                      self.COUNTRY_DATE_FORMAT)
         data_on_date = \
             self.data_all_days.loc[self.data_all_days['Date'] == date].copy()
-        column_list = ['New cases', 'New deaths', 'New recovered']
+        column_list = ['Country/Region', 'New cases',
+                       'New deaths', 'New recovered']
         data_on_date = data_on_date.loc[:, column_list]
         data_on_date = data_on_date.reset_index(drop=True)
         if to_scale:
@@ -143,16 +105,42 @@ class Loader:
                 self.country_population.values*1e4
         return data
 
-    def get_name(self, code: int):
+class LoaderUS(Loader):
+    """Stores data from specified files. Extracts data relevent to given date.
+
+    Attributes
+    ----------
+        DATE_FORMAT (str): format in which dates sould be passed to the
+        class' methods.
+        US_DATE_FORMAT (str): format in which dates are stored in INFO_FILE.
+        INFO_FILE (str): file from which to get data about US counties.
+
+    """
+
+    US_DATE_FORMAT = '%#m/%#d/%y'
+    INFO_FILE = 'data/usa_county_wise.csv'
+    ID_COLUMN = 'UID'
+    COLUMN_LIST = ['Confirmed', 'Deaths']
+    MAIN_COLUMN = 'Confirmed'
+
+    def extract_data(self, date):
         """
-        Get name of admin unit given its code.
+        Extract data for a particular date.
 
         Args:
-            code (int): code of admin unit.
+            date (str): format as in DATE_FORMAT.
 
         Returns
         -------
-            str: name of admin unit.
+            pandas.DataFrame: contains data on given date.
 
         """
-        return self.name_dict[code]
+        date = format(dt.strptime(date, self.DATE_FORMAT).date(),
+                      self.US_DATE_FORMAT)
+        data_on_date = \
+            self.data_all_days.loc[self.data_all_days['Date'] == date].copy()
+        column_list = ['UID', 'Confirmed', 'Deaths']
+        data_on_date = data_on_date.loc[:, column_list]
+        data_on_date = data_on_date.loc[data_on_date['Confirmed'] +
+                                        data_on_date['Deaths'] > 0]
+        return data_on_date.reset_index(drop=True)

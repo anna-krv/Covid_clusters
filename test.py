@@ -1,5 +1,7 @@
 # -*- coding: utf-8 -*-
 """
+Tests for disjoint_set and graphs modules.
+
 Created on Tue Aug  4 16:18:58 2020
 
 @author: Anna Kravets
@@ -64,7 +66,7 @@ def test_MST():
   edge_list.append((2,5,2))
   graph=Graph(7, edge_list)
   edge_list_tree=MST(graph)
-  
+
   for edge in edge_list_tree:
     print(edge)
 

@@ -15,7 +15,7 @@ import numpy as np
 import pandas as pd
 
 
-class Clusters_Builder:
+class ClustersBuilder:
     """Rrepresents a builder that could divide data points in clusters.
 
     Could build a given # of clusters or deduce optimal # of clusters without any
@@ -23,9 +23,7 @@ class Clusters_Builder:
 
     Attributes
     ----------
-    n_vert: int
-        number of vertices (administrative units like countries or countries)
-    loader: loader.Loader
+    loader:
         stores data with features of vertices.
 
     """
@@ -39,84 +37,11 @@ class Clusters_Builder:
           None.
 
         """
-        self.loader = loader.Loader()
-
-    def get_n_clusters(self, graph: graphs.Graph, n_clusters: int):
-        """
-        Build n_clusters on vertices from graph.
-
-        Uses procedure for building MST but stops when gets n_clusters # of
-        connected components.
-
-        Args:
-            graph (Graph): connected, undirected graph with weighted edges.
-            n_clusters (int): number of clusters to build.
-
-        Returns
-        -------
-            list: contains sets that have been formed, set=cluster.
-
-        """
-        edge_list = sorted(graph.edge_list, key=lambda edge: edge.weight)
-        edge_list_tree = []
-        edge_index = 0
-        components = Disjoint_Sets(graph.n_vert)
-        optimal_size = graph.n_vert/n_clusters
-        while len(edge_list_tree)<graph.n_vert-n_clusters:
-            edge = edge_list[edge_index]
-            from_vert, to_vert = edge.from_vert, edge.to_vert
-            parent_from = components.find_set(from_vert)
-            parent_to = components.find_set(to_vert)
-            if parent_from != parent_to and \
-                components.tree_size[parent_from] < 180 and \
-                    components.tree_size[parent_to] < 180:
-                components.union(from_vert, to_vert)
-                edge_list_tree.append(edge)
-            edge_index += 1
-        return components.get_all_sets()
-
-
-    def get_clusters_optimal(self, edge_list, n_vert):
-        """
-        Build optimal # of clusters on vertices from graph. Use procedure for
-        building MST and then delete edges with weight W>Mean_weight+std_weight.
-
-        Args:
-            edge_list (list): list with triples of weighted edges:
-                (from vert, to vert, weight).
-            n_vert (int): number of vertices.
-
-        Returns
-        -------
-            list: contains sets that have been formed, set=cluster.
-
-        """
-        edge_list = sorted(edge_list, key=lambda edge: edge[2])
-        edge_list_tree = []
-        edge_index = 0
-        components = Disjoint_Sets(n_vert)
-        components_history = [components.get_all_sets()]
-        while len(edge_list_tree) < n_vert-1:
-            edge = edge_list[edge_index]
-            from_vert, to_vert = edge[0], edge[1]
-            parent_from = components.find_set(from_vert)
-            parent_to = components.find_set(to_vert)
-            if parent_from != parent_to:
-                components.union(from_vert, to_vert)
-                components_history.append(components.get_all_sets())
-                edge_list_tree.append(edge)
-            edge_index += 1
-
-        weights = np.array([edge[2] for edge in edge_list_tree])
-
-        mean_weight = np.mean(weights)
-        std_weight = np.std(weights)
-        num_edge_to_delete = np.sum(weights > mean_weight + std_weight)
-        return components_history[-num_edge_to_delete-1], weights
+        self.loader = None
 
     def build_clusters_from_edge_list(self, edge_list, n_vert):
         """
-        Build clusters as joint components of graph built on edge_list.
+        Build clusters as joint components of graph built on given edge_list.
 
         Args:
             edge_list (list): list with triples of weighted edges:
@@ -150,24 +75,46 @@ class Clusters_Builder:
                               in cluster, ascending order).
 
         """
-        data = self.loader.extract_usa_data(date)
+        data = self.loader.extract_data(date)
         n_vert = data.shape[0]
-        print(n_vert)
-        data_norm = normalize_data(data.loc[:, ['Confirmed', 'Deaths']])
+        data_norm = normalize_data(data.loc[:, self.loader.COLUMN_LIST])
         edge_list = get_edge_list(data_norm)
-        print('edges')
+
         edge_list_tree = graphs.MST(edge_list, n_vert)
-        weights = np.array([edge[2] for edge in edge_list_tree])
-        print('MST')
         inspector = inspection.Inspector(edge_list_tree)
-        edge_list_trunc = inspector.delete_edges()
+        # mu=20, ratio=8 for US
+        edge_list_trunc = inspector.delete_edges_local(mu=5,
+                                                       ratio_threshold=2.5)
         clusters = self.build_clusters_from_edge_list(edge_list_trunc, n_vert)
-        print('clust')
-        clusters = sort_clusters(clusters, data, col_name='Confirmed')
-        names = [set((data.iloc[_id]['UID'],
-                      self.loader.get_name(data.iloc[_id]['UID']))
-                     for _id in cluster) for cluster in clusters]
-        return weights, names
+        clusters = sort_clusters(clusters, data,
+                                 col_name=self.loader.MAIN_COLUMN)
+        clusters = [set(data.iloc[i][self.loader.ID_COLUMN] for i in cluster)
+                 for cluster in clusters]
+        return clusters
+
+class ClustersBuilderUS(ClustersBuilder):
+    def __init__(self):
+        """
+        Set up Loader.
+
+        Returns
+        -------
+          None.
+
+        """
+        self.loader = loader.LoaderUS()
+
+class ClustersBuilderCountries(ClustersBuilder):
+    def __init__(self):
+        """
+        Set up Loader.
+
+        Returns
+        -------
+          None.
+
+        """
+        self.loader = loader.LoaderCountries()
 
 
 def get_edge_list(data):

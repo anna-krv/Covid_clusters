@@ -6,6 +6,7 @@
 /html_us.v0/
 /html_countries/
 /html_countries.v0/
+*.png
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
