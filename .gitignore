@@ -2,7 +2,10 @@
 /pictures.v1/
 /pictures.v2/
 /pictures/
-
+/html_us/
+/html_us.v0/
+/html_countries/
+/html_countries.v0/
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
