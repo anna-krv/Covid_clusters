@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-Contains class that builds maps and creates pictures of geo clusters.
+Contains class that builds maps and saves images of colored clusters.
 
 Created on Sat Aug 15 19:39:51 2020
 
@@ -13,9 +13,34 @@ import loader
 import selenium.webdriver
 import requests
 
+
 class MapBuilder:
+    """
+    Creates map, colors it in different colors based on cluster id.
+
+    Map could be saved as html page or as an image.
+
+    Attributes
+    ----------
+        geo_json:
+            stores info about geography of admin units.
+        clust_column:
+            name of column for storing clusters' id.
+        n_clust:
+            number of clusters.
+    """
+
     def __init__(self):
+        """
+        Load GeoJson data that will be used to draw boundaries of admin units.
+
+        Returns
+        -------
+            None.
+
+        """
         self.geo_json = self.load_geo_json()
+        self.clust_column = 'Cluster id'
 
     def get_color(self, feature):
         """
@@ -30,27 +55,48 @@ class MapBuilder:
             str: color given to cluster the admin unit belongs to.
 
         """
-        id_ = feature['properties'][self.id_json]
-        if id_ not in self.df_dict:
+        if feature['properties'][self.clust_column] == 0:
             return '#ffffff'
-        return self.colorscale(self.df_dict[id_])
+        return self.colorscale(feature['properties'][self.clust_column])
 
     def modify_geo_json(self, data):
+        """
+        Set new properties for GeoJson data.
+
+        Add properties from column_list and a property 'CLuster id'.
+
+        Args:
+            data (pd.DataFrame): new properties are stored in data in
+            self.column_list columns. Index column in data corresponds to
+            id_json property in GeoJson.
+
+        Returns
+        -------
+            None.
+
+        """
         for i in range(len(self.geo_json['features'])):
             id_ = self.geo_json['features'][i]['properties'][self.id_json]
-            for name in self.col_names + ['Cluster id']:
+            for name in self.column_list + [self.clust_column]:
                 self.geo_json['features'][i]['properties'][name] = 0
-            for name in self.col_names:
-                if id_ in data[self.id_df].values:
+                if id_ in data.index.values:
                     self.geo_json['features'][i]['properties'][name] =\
-                        int(data[data[self.id_df] == id_][name].values[0])
-            if id_ in self.df_dict:
-                self.geo_json['features'][i]['properties']['Cluster id'] = \
-                    self.df_dict[id_]
+                        int(data.loc[id_][name])
 
-    def create_map(self, n, date):
-        self.colorscale = create_colorscale(n)
-        m = folium.Map(**self.map_args)
+    def save_map_impl(self, date: str):
+        """
+        Create map and save it as html page.
+
+        Args:
+            date (str): is used in title of html page.
+
+        Returns
+        -------
+            None.
+
+        """
+        self.colorscale = create_colorscale(self.n_clust)
+        map_ = folium.Map(**self.map_args)
         folium.GeoJson(
             self.geo_json,
             style_function=lambda feature: {
@@ -61,26 +107,37 @@ class MapBuilder:
                 },
             name='COVID CLUSTERS',
             tooltip=folium.features.GeoJsonTooltip(
-                fields=[self.name_json]+self.col_names+['Cluster id'],
-                aliases=['Name']+self.col_names+['Cluster id'])
-            ).add_to(m)
-        m.add_child(self.colorscale)
+                fields=[self.name_json]+self.column_list+[self.clust_column],
+                aliases=['Name']+self.column_list+[self.clust_column])
+            ).add_to(map_)
+        map_.add_child(self.colorscale)
 
-        title_html = '''<head><style> html { overflow-y: hidden; }
-            </style></head>
-            '''
-        title_html += '''<h1 align="center"><b>{}</b></h3>'''.format(date)
-        m.get_root().html.add_child(folium.Element(title_html))
+        add_title(map_, date)
 
-        m.save(self.map_folder+'/'+date+'.html')
+        map_.save(self.map_folder+'/'+date+'.html')
 
-    def save_map(self, builder, date):
+    def save_map(self, builder, date: str):
+        """
+        Save map with colored clusters built for given date.
+
+        Args:
+            builder (clust.ClustersBuilder): is used to get clusters.
+            date (str): for this date clusters are built.
+
+        Returns
+        -------
+            None.
+
+        """
         clusters = builder.get_clusters(date)
         data = builder.loader.extract_data(date)
-        n_clust = len(clusters)
-        self.df_dict = {id_: i+1 for i in range(n_clust) for id_ in clusters[i]}
+        data = data.set_index(self.id_df)
+        data[self.clust_column] = 0
+        self.n_clust = len(clusters)
+        for i in range(self.n_clust):
+            data.loc[list(clusters[i]), self.clust_column] = i+1
         self.modify_geo_json(data)
-        self.create_map(n_clust, date)
+        self.save_map_impl(date)
 
     def save_as_img(self, dates):
         """
@@ -95,10 +152,11 @@ class MapBuilder:
 
         """
         driver = selenium.webdriver.Chrome()
-        driver.set_window_size(1100, 900) # 1800, 800 for US
+        driver.set_window_size(1100, 900)  # 1800, 800 for US
         for date in dates:
             driver.get(
-                "file:///C:/Users/DELL/Covid_clusters/"+self.map_folder+"/"+date+".html"
+                "file:///C:/Users/DELL/Covid_clusters/"+
+                self.map_folder+"/"+date+".html"
                 )
             driver.save_screenshot(self.img_folder+'/'+date+'.png')
             print(date)
@@ -106,11 +164,26 @@ class MapBuilder:
 
 
 class MapBuilderUS(MapBuilder):
+    """
+    Creates map of US counties, colored based on county's cluster id.
+
+    Map could be saved as html page or as an image.
+
+    """
+
     def __init__(self):
+        """
+        Set up specific fields for data processing, folder names, load GeoJson.
+
+        Returns
+        -------
+            None.
+
+        """
         self.id_json = 'geoid'
         self.name_json = 'namelsad'
         self.id_df = loader.LoaderUS.ID_COLUMN
-        self.col_names = loader.LoaderUS.COLUMN_LIST
+        self.column_list = loader.LoaderUS.COLUMN_LIST
         self.map_folder = 'html_us'
         self.img_folder = 'pictures_us'
         self.map_args = {'location': [36, -97], 'zoomSnap': 0.25,
@@ -119,6 +192,14 @@ class MapBuilderUS(MapBuilder):
         MapBuilder.__init__(self)
 
     def load_geo_json(self):
+        """
+        Load counties' boundaries.
+
+        Returns
+        -------
+            geo_json (dict): GeoJson data with boundaries of countries.
+
+        """
         id_NY_list = ['36005', '36081', '36047', '36085']
         NY_id = '36061'
         path = 'data/us-county-boundaries.geojson'
@@ -132,12 +213,28 @@ class MapBuilderUS(MapBuilder):
                     int('840'+id_)
             return geo_json
 
+
 class MapBuilderCountries(MapBuilder):
+    """
+    Creates map with countries, colored on country's cluster id.
+
+    Map could be saved as html page or as an image.
+
+    """
+
     def __init__(self):
+        """
+        Set up specific fields for data processing, folder names, load GeoJson.
+
+        Returns
+        -------
+            None.
+
+        """
         self.id_json = 'ADMIN'
         self.name_json = 'ADMIN'
         self.id_df = loader.LoaderCountries.ID_COLUMN
-        self.col_names = loader.LoaderCountries.COLUMN_LIST
+        self.column_list = loader.LoaderCountries.COLUMN_LIST
         self.img_folder = 'pictures_countries'
         self.map_folder = 'html_countries'
         self.map_args = {'tiles': "cartodbpositron", 'zoom_start': 2,
@@ -147,6 +244,14 @@ class MapBuilderCountries(MapBuilder):
         MapBuilder.__init__(self)
 
     def load_geo_json(self):
+        """
+        Load countries' boundaries.
+
+        Returns
+        -------
+            geo_json (dict): GeoJson data with boundaries of US counties.
+
+        """
         country_shapes = 'https://raw.githubusercontent.com/datasets/' + \
             'geo-countries/master/data/countries.geojson'
         geo_json = json.loads(requests.get(country_shapes).text)
@@ -165,6 +270,26 @@ class MapBuilderCountries(MapBuilder):
                 geo_json['features'][i]['properties'][self.id_json] = \
                     name_dict[id_]
         return geo_json
+
+
+def add_title(map_: folium.Map, date: str):
+    """
+    Add title showing date to the map.
+
+    Args:
+        map_ (folium.Map).
+        date (str).
+
+    Returns
+    -------
+        None.
+
+    """
+    title_html = '''<head><style> html { overflow-y: hidden; }
+            </style></head>
+            '''
+    title_html += '''<h1 align="center"><b>{}</b></h3>'''.format(date)
+    map_.get_root().html.add_child(folium.Element(title_html))
 
 
 def create_colorscale(n):
