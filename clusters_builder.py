@@ -1,43 +1,50 @@
 # -*- coding: utf-8 -*-
 """
+ClustersBuilder splits data points in clusters.
+
+ClustersBuilderUS uses data about US counties. ClustersBuilderCountries uses
+data about countries.
+
 Created on Fri Aug 14 10:54:34 2020
 
 @author: Anna Kravets
 """
 from disjoint_set_optimized import Disjoint_Sets
-import edges
 from functools import partial
 import graphs
 import inspection
-import loader
 from multiprocessing import Pool
 import numpy as np
-import pandas as pd
 
 
 class ClustersBuilder:
-    """Rrepresents a builder that could divide data points in clusters.
+    """Divides data points in clusters.
 
-    Could build a given # of clusters or deduce optimal # of clusters without any
-    pregiven info.
+    Could build a given # of clusters or deduce optimal # of clusters
+    automatically.
 
     Attributes
     ----------
-    loader:
-        stores data with features of vertices.
+    loader: loader.Loader
+        stores data with features of data points. loader.LoaderUS should be
+        used for building clusters for US counties. loader.LoaderCountries -
+        for building clusters for countries.
 
     """
 
-    def __init__(self):
+    def __init__(self, loader):
         """
         Set up Loader.
+
+        Args:
+            loader (Loader): stores data.
 
         Returns
         -------
           None.
 
         """
-        self.loader = None
+        self.loader = loader
 
     def build_clusters_from_edge_list(self, edge_list, n_vert):
         """
@@ -89,32 +96,8 @@ class ClustersBuilder:
         clusters = sort_clusters(clusters, data,
                                  col_name=self.loader.MAIN_COLUMN)
         clusters = [set(data.iloc[i][self.loader.ID_COLUMN] for i in cluster)
-                 for cluster in clusters]
+                    for cluster in clusters]
         return clusters
-
-class ClustersBuilderUS(ClustersBuilder):
-    def __init__(self):
-        """
-        Set up Loader.
-
-        Returns
-        -------
-          None.
-
-        """
-        self.loader = loader.LoaderUS()
-
-class ClustersBuilderCountries(ClustersBuilder):
-    def __init__(self):
-        """
-        Set up Loader.
-
-        Returns
-        -------
-          None.
-
-        """
-        self.loader = loader.LoaderCountries()
 
 
 def get_edge_list(data):
@@ -134,7 +117,7 @@ def get_edge_list(data):
     all_pairs = np.array([(i, j) for i in range(n_vert)
                           for j in range(i+1, n_vert)])
     pool = Pool(4)
-    edge_list = pool.map(partial(edges.build_edge, data=data), all_pairs)
+    edge_list = pool.map(partial(graphs.build_edge, data=data), all_pairs)
     pool.close()
     pool.join()
     return edge_list

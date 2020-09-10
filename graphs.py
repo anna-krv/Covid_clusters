@@ -1,40 +1,12 @@
 # -*- coding: utf-8 -*-
 """
+Contains function for building Minimum Spanning Tree, for building edge.
 Created on Wed Aug    5 13:06:38 2020
 
 @author: Anna Kravets
 """
-from disjoint_set_optimized import Disjoint_Sets
-
-class Graph:
-    def __init__(self, n_vert: int, edge_list: list):
-        """
-        Create an undirected graph with vertices numbered 0..n_vert-1,
-        and weighted edges.
-
-        Args:
-            n_vert (int): number of vertices.
-            edge_list (list): contains triples (from_vert, to_vert, weigth).
-
-        Returns
-        -------
-            None.
-
-        """
-        self.n_vert = n_vert
-        self.edge_list = [Edge(triple[0], triple[1], triple[2]) for triple \
-                                        in edge_list]
-
-
-class Edge:
-    def __init__(self, from_vert, to_vert, weight):
-        self.from_vert = from_vert
-        self.to_vert = to_vert
-        self.weight = weight
-
-    def __str__(self):
-        return 'from: '+str(self.from_vert)+' to: '+str(self.to_vert)\
-            + ' weight: '+str(self.weight)
+import disjoint_set_optimized as dsj_set
+import numpy as np
 
 
 def MST(edge_list: list, n_vert: int):
@@ -54,7 +26,7 @@ def MST(edge_list: list, n_vert: int):
     edge_list = sorted(edge_list, key=lambda edge: edge[2])
     edge_list_tree = []
     edge_index = 0
-    components = Disjoint_Sets(n_vert)
+    components = dsj_set.Disjoint_Sets(n_vert)
     while len(edge_list_tree) < n_vert-1:
         edge = edge_list[edge_index]
         from_vert, to_vert = edge[0], edge[1]
@@ -63,3 +35,21 @@ def MST(edge_list: list, n_vert: int):
             edge_list_tree.append(edge)
         edge_index += 1
     return edge_list_tree
+
+
+def build_edge(pair, data):
+    """
+    Build edge as a triple (pair[0], pair[1], weight of edge).
+
+    Args:
+      data (pandas.DataFrame): contains features of each data point.
+      pair (tuple): contains 2 indexes of data points.
+
+    Returns
+    -------
+      tuple: (pair[0], pair[1], distance measured in l2 metrics).
+
+    """
+    i, j = pair[0], pair[1]
+    diff = (data.iloc[i]-data.iloc[j]).values
+    return (i, j, np.linalg.norm(diff))
