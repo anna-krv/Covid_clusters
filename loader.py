@@ -1,5 +1,7 @@
 # -*- coding: utf-8 -*-
 """
+Loader stores data in a data frame and extracts data relevant to given date.
+
 Created on Sat Sep  5 09:57:37 2020
 
 @author: Anna Kravets
@@ -13,8 +15,7 @@ class Loader:
 
     Attributes
     ----------
-        DATE_FORMAT (str): format in which dates sould be passed to the
-        class' methods.
+        DATE_FORMAT (str): format in which dates sould be passed to methods.
 
     """
 
@@ -24,22 +25,46 @@ class Loader:
         self.data_all_days = pd.read_csv(self.INFO_FILE)
         self.n_vert = len(set(self.data_all_days[self.ID_COLUMN]))
 
+    def extract_data(self, date):
+        """
+        Extract data for a particular date.
+
+        Args:
+            date (str): format as in DATE_FORMAT.
+
+        Returns
+        -------
+            pandas.DataFrame: contains data on given date.
+
+        """
+        date = format(dt.strptime(date, self.DATE_FORMAT).date(),
+                      self.DATE_FORMAT_INTERNAL)
+        data_on_date = \
+            self.data_all_days.loc[self.data_all_days['Date'] == date].copy()
+        column_list = self.COLUMN_LIST + [self.ID_COLUMN]
+        data_on_date = data_on_date.loc[:, column_list]
+        return data_on_date.reset_index(drop=True)
+
+
 class LoaderCountries(Loader):
     """Stores data from specified files. Extracts data relevent to given date.
 
     Attributes
     ----------
-        DATE_FORMAT (str): format in which dates sould be passed to the
-        class' methods.
-        COUNTRY_DATE_FORMAT (str): format in which dates are stored
+        DATE_FORMAT_INTERNAL (str): format in which dates are stored
         in INFO_FILE.
         INFO_FILE (str): file with data about all countries.
         POPULATION_INFO_FILE (str): file with data on population of countries
         present in COUNTRY_INFO_FILE.
+        ID_COLUMN (str): name of column with a unique value for each country.
+        COLUMN_LIST (list): contains names of columns that are used in
+        analysis.
+        MAIN_COLUMN (str): name of column. On values from this column clusters
+        will be sort.
 
     """
 
-    COUNTRY_DATE_FORMAT = '%Y-%m-%d'
+    DATE_FORMAT_INTERNAL = '%Y-%m-%d'
     INFO_FILE = 'data/full_grouped.csv'
     POPULATION_INFO_FILE = 'data/population.csv'
     ID_COLUMN = 'Country/Region'
@@ -73,14 +98,7 @@ class LoaderCountries(Loader):
             data_on_date (pandas.DataFrame): contains data on given date.
 
         """
-        date = format(dt.strptime(date, self.DATE_FORMAT).date(),
-                      self.COUNTRY_DATE_FORMAT)
-        data_on_date = \
-            self.data_all_days.loc[self.data_all_days['Date'] == date].copy()
-        column_list = ['Country/Region', 'New cases',
-                       'New deaths', 'New recovered']
-        data_on_date = data_on_date.loc[:, column_list]
-        data_on_date = data_on_date.reset_index(drop=True)
+        data_on_date = Loader.extract_data(self, date)
         if to_scale:
             data_on_date = self.scale_by_population(data_on_date)
         return data_on_date
@@ -105,19 +123,24 @@ class LoaderCountries(Loader):
                 self.country_population.values*1e4
         return data
 
+
 class LoaderUS(Loader):
     """Stores data from specified files. Extracts data relevent to given date.
 
     Attributes
     ----------
-        DATE_FORMAT (str): format in which dates sould be passed to the
-        class' methods.
-        US_DATE_FORMAT (str): format in which dates are stored in INFO_FILE.
+        DATE_FORMAT_INTERNAL (str): format in which dates are stored in
+        INFO_FILE.
         INFO_FILE (str): file from which to get data about US counties.
+        ID_COLUMN (str): name of column with a unique value for each country.
+        COLUMN_LIST (list): contains names of columns that are used in
+        analysis.
+        MAIN_COLUMN (str): name of column. On values from this column clusters
+        will be sort.
 
     """
 
-    US_DATE_FORMAT = '%#m/%#d/%y'
+    DATE_FORMAT_INTERNAL = '%#m/%#d/%y'
     INFO_FILE = 'data/usa_county_wise.csv'
     ID_COLUMN = 'UID'
     COLUMN_LIST = ['Confirmed', 'Deaths']
@@ -135,12 +158,7 @@ class LoaderUS(Loader):
             pandas.DataFrame: contains data on given date.
 
         """
-        date = format(dt.strptime(date, self.DATE_FORMAT).date(),
-                      self.US_DATE_FORMAT)
-        data_on_date = \
-            self.data_all_days.loc[self.data_all_days['Date'] == date].copy()
-        column_list = ['UID', 'Confirmed', 'Deaths']
-        data_on_date = data_on_date.loc[:, column_list]
+        data_on_date = Loader.extract_data(self, date)
         data_on_date = data_on_date.loc[data_on_date['Confirmed'] +
                                         data_on_date['Deaths'] > 0]
         return data_on_date.reset_index(drop=True)

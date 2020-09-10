@@ -6,12 +6,12 @@ Created on Tue Aug  4 13:46:34 2020
 
 @author: Anna Kravets
 """
-import clusters_builder
+import clust
 import loader
 import visualization
 
 if __name__ == '__main__':
-    cluster_builder = clusters_builder.ClustersBuilder(loader.LoaderCountries())
+    cluster_builder = clust.ClustersBuilder(loader.LoaderCountries())
     dates = ['15.04.20']
     map_builder = visualization.MapBuilderCountries()
     for date in dates:
