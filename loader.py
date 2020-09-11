@@ -7,6 +7,7 @@ Created on Sat Sep  5 09:57:37 2020
 @author: Anna Kravets
 """
 from datetime import datetime as dt
+from datetime import timedelta
 import pandas as pd
 
 
@@ -159,6 +160,11 @@ class LoaderUS(Loader):
 
         """
         data_on_date = Loader.extract_data(self, date)
-        data_on_date = data_on_date.loc[data_on_date['Confirmed'] +
-                                        data_on_date['Deaths'] > 5]
-        return data_on_date.reset_index(drop=True)
+        date_on_prev_week = format(dt.strptime(date, Loader.DATE_FORMAT) -
+                                   timedelta(days=7), Loader.DATE_FORMAT)
+        data_on_prev_week = Loader.extract_data(self, date_on_prev_week)
+        data = data_on_date
+        data['Confirmed'] = data['Confirmed'] - data_on_prev_week['Confirmed']
+        data['Deaths'] = data['Deaths'] - data_on_prev_week['Deaths']
+        data = data.loc[data['Confirmed'] + data['Deaths'] > 0]
+        return data.reset_index(drop=True)

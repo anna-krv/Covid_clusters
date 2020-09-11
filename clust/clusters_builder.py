@@ -12,7 +12,7 @@ import dsj_set
 from functools import partial
 from multiprocessing import Pool
 import numpy as np
-
+import pandas as pd
 
 class ClustersBuilder:
     """Divides data points in clusters.
@@ -87,9 +87,9 @@ class ClustersBuilder:
 
         edge_list_tree = MST(edge_list, n_vert)
         inspector = Inspector(edge_list_tree)
-        # mu=20, ratio=8 for US, mu=5, ratio=2.5 for countries
-        edge_list_trunc = inspector.delete_edges_local(mu=20,
-                                                       ratio_threshold=8)
+        # mu=10, ratio=5 for US, mu=5, ratio=2.5 for countries were used
+        edge_list_trunc = inspector.delete_edges_local(mu=10,
+                                                       ratio_threshold=5)
         clusters = self.build_clusters_from_edge_list(edge_list_trunc, n_vert)
         clusters = sort_clusters(clusters, data,
                                  col_name=self.loader.MAIN_COLUMN)
@@ -97,6 +97,19 @@ class ClustersBuilder:
                     for cluster in clusters]
         return clusters
 
+    def save_clusters(self, date: str, file_name: str, n_clusters=5):
+        clusters = self.get_clusters(date)
+        id_list = []
+        clust_list = []
+        for i in range(len(clusters)):
+            for id_ in clusters[i]:
+                id_list.append(id_)
+                clust_list.append(i+1)
+        dict_ = {'id': id_list,
+                 'Cluster id': clust_list,
+                 'Date': [date]*len(id_list)}
+        df = pd.DataFrame.from_dict(dict_)
+        df.to_csv(file_name, mode='a', header=None)
 
 def get_edge_list(data):
     """
