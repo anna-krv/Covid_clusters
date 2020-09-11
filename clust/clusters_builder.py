@@ -81,14 +81,15 @@ class ClustersBuilder:
         """
         data = self.loader.extract_data(date)
         n_vert = data.shape[0]
+        print('n_vert ', n_vert)
         data_norm = normalize_data(data.loc[:, self.loader.COLUMN_LIST])
         edge_list = get_edge_list(data_norm)
 
         edge_list_tree = MST(edge_list, n_vert)
         inspector = Inspector(edge_list_tree)
-        # mu=20, ratio=8 for US
-        edge_list_trunc = inspector.delete_edges_local(mu=5,
-                                                       ratio_threshold=2.5)
+        # mu=20, ratio=8 for US, mu=5, ratio=2.5 for countries
+        edge_list_trunc = inspector.delete_edges_local(mu=20,
+                                                       ratio_threshold=8)
         clusters = self.build_clusters_from_edge_list(edge_list_trunc, n_vert)
         clusters = sort_clusters(clusters, data,
                                  col_name=self.loader.MAIN_COLUMN)

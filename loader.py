@@ -160,5 +160,5 @@ class LoaderUS(Loader):
         """
         data_on_date = Loader.extract_data(self, date)
         data_on_date = data_on_date.loc[data_on_date['Confirmed'] +
-                                        data_on_date['Deaths'] > 0]
+                                        data_on_date['Deaths'] > 5]
         return data_on_date.reset_index(drop=True)
