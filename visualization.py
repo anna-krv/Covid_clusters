@@ -10,8 +10,11 @@ import branca
 import folium
 import json
 import loader
+from datetime import datetime as dt
+from datetime import timedelta
 import selenium.webdriver
 import requests
+import pandas as pd
 
 
 class MapBuilder:
@@ -112,7 +115,7 @@ class MapBuilder:
             ).add_to(map_)
         map_.add_child(self.colorscale)
 
-        add_title(map_, date)
+        self.add_title(map_, date)
 
         map_.save(self.map_folder+'/'+date+'.html')
 
@@ -129,13 +132,14 @@ class MapBuilder:
             None.
 
         """
-        clusters = builder.get_clusters(date)
+        df = self.df[self.df['Date'] == date]
         data = builder.loader.extract_data(date)
         data = data.set_index(self.id_df)
+        df = df.set_index('id')
         data[self.clust_column] = 0
-        self.n_clust = len(clusters)
-        for i in range(self.n_clust):
-            data.loc[list(clusters[i]), self.clust_column] = i+1
+        self.n_clust = len(set(df[self.clust_column].values))
+        for id_ in df.index:
+            data.loc[id_, self.clust_column] = df.loc[id_, self.clust_column]
         self.modify_geo_json(data)
         self.save_map_impl(date)
 
@@ -152,7 +156,7 @@ class MapBuilder:
 
         """
         driver = selenium.webdriver.Chrome()
-        driver.set_window_size(1100, 900)  # 1800, 800 for US
+        driver.set_window_size(1250, 800)  # 1250, 800 for US, 1100, 900 otherw
         for date in dates:
             driver.get(
                 "file:///C:/Users/DELL/Covid_clusters/"+
@@ -188,6 +192,8 @@ class MapBuilderUS(MapBuilder):
         self.img_folder = 'pictures_us'
         self.map_args = {'location': [36, -97], 'zoomSnap': 0.25,
                          'zoom_start': 4.75, 'zoom_control': False}
+        self.file_clust = 'results/usa_clust.csv'
+        self.df = pd.read_csv(self.file_clust)
 
         MapBuilder.__init__(self)
 
@@ -213,6 +219,28 @@ class MapBuilderUS(MapBuilder):
                     int('840'+id_)
             return geo_json
 
+    def add_title(self, map_: folium.Map, date: str):
+        """
+        Add title showing week start and end date to the map.
+
+        Args:
+            map_ (folium.Map).
+            date (str): start of the following week.
+
+        Returns
+        -------
+            None.
+
+        """
+        title_html = '''<head><style> html { overflow-y: hidden; }
+                </style></head>
+                '''
+        date_prev = format(dt.strptime(date, loader.Loader.DATE_FORMAT) -
+                           timedelta(days=7), '%d.%m')
+        date = format(dt.strptime(date, loader.Loader.DATE_FORMAT), '%d.%m')
+        title_html += '''<h1 align="center"><b>{}-{}</b></h3>'''.format(
+            date_prev, date)
+        map_.get_root().html.add_child(folium.Element(title_html))
 
 class MapBuilderCountries(MapBuilder):
     """
@@ -240,6 +268,8 @@ class MapBuilderCountries(MapBuilder):
         self.map_args = {'tiles': "cartodbpositron", 'zoom_start': 2,
                          'location': [40., 10.], 'zoom_control': False,
                          'max_bounds': True}
+        self.file_clust = 'results/countries_clust.csv'
+        self.df = pd.read_csv(self.file_clust)
 
         MapBuilder.__init__(self)
 
@@ -271,25 +301,27 @@ class MapBuilderCountries(MapBuilder):
                     name_dict[id_]
         return geo_json
 
+    def add_title(self, map_: folium.Map, date: str):
+        """
+        Add title showing date to the map.
 
-def add_title(map_: folium.Map, date: str):
-    """
-    Add title showing date to the map.
+        Args:
+            map_ (folium.Map).
+            date (str).
 
-    Args:
-        map_ (folium.Map).
-        date (str).
+        Returns
+        -------
+            None.
 
-    Returns
-    -------
-        None.
+        """
+        title_html = '''<head><style> html { overflow-y: hidden; }
+                </style></head>
+                '''
+        title_html += '''<h1 align="center"><b>{}</b></h3>'''.format(date)
+        map_.get_root().html.add_child(folium.Element(title_html))
 
-    """
-    title_html = '''<head><style> html { overflow-y: hidden; }
-            </style></head>
-            '''
-    title_html += '''<h1 align="center"><b>{}</b></h3>'''.format(date)
-    map_.get_root().html.add_child(folium.Element(title_html))
+
+
 
 
 def create_colorscale(n):

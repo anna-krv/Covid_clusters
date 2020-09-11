@@ -159,12 +159,11 @@ class LoaderUS(Loader):
             pandas.DataFrame: contains data on given date.
 
         """
-        data_on_date = Loader.extract_data(self, date)
+        data = Loader.extract_data(self, date)
         date_on_prev_week = format(dt.strptime(date, Loader.DATE_FORMAT) -
                                    timedelta(days=7), Loader.DATE_FORMAT)
         data_on_prev_week = Loader.extract_data(self, date_on_prev_week)
-        data = data_on_date
-        data['Confirmed'] = data['Confirmed'] - data_on_prev_week['Confirmed']
-        data['Deaths'] = data['Deaths'] - data_on_prev_week['Deaths']
+        for name in self.COLUMN_LIST:
+            data[name] = data[name] - data_on_prev_week[name]
         data = data.loc[data['Confirmed'] + data['Deaths'] > 0]
         return data.reset_index(drop=True)

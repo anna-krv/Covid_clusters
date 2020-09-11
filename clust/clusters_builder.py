@@ -81,13 +81,12 @@ class ClustersBuilder:
         """
         data = self.loader.extract_data(date)
         n_vert = data.shape[0]
-        print('n_vert ', n_vert)
         data_norm = normalize_data(data.loc[:, self.loader.COLUMN_LIST])
         edge_list = get_edge_list(data_norm)
 
         edge_list_tree = MST(edge_list, n_vert)
         inspector = Inspector(edge_list_tree)
-        # mu=10, ratio=5 for US, mu=5, ratio=2.5 for countries were used
+        # mu=10, ratio=5 for US, mu=5, ratio=2.5 for countries
         edge_list_trunc = inspector.delete_edges_local(mu=10,
                                                        ratio_threshold=5)
         clusters = self.build_clusters_from_edge_list(edge_list_trunc, n_vert)
@@ -98,6 +97,19 @@ class ClustersBuilder:
         return clusters
 
     def save_clusters(self, date: str, file_name: str, n_clusters=5):
+        """
+        Build and save clusters for given date to csv file.
+
+        Args:
+            date (str): date for which clusters will be built.
+            file_name (str): file to which results will be appended.
+            n_clusters (int, optional): # of clusters to built. Defaults to 5.
+
+        Returns
+        -------
+            None.
+
+        """
         clusters = self.get_clusters(date)
         id_list = []
         clust_list = []
@@ -110,6 +122,7 @@ class ClustersBuilder:
                  'Date': [date]*len(id_list)}
         df = pd.DataFrame.from_dict(dict_)
         df.to_csv(file_name, mode='a', header=None)
+
 
 def get_edge_list(data):
     """

@@ -47,7 +47,7 @@ class Inspector:
             n_delete = np.sum(weights > mean_weight + std_weight)
         return self.edge_list[:-n_delete]
 
-    def delete_edges_local(self, mu=8, ratio_threshold=20):
+    def delete_edges_local(self, mu=10, ratio_threshold=5):
         self.edge_dict = self.get_dict()
         new_edge_list = []
         for edge in self.edge_list:
